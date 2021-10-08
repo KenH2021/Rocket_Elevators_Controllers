@@ -1,0 +1,173 @@
+''--------------DEFINE OBJECTS----------------------
+DEFINE battery USING columnList and elevatorGroup
+ENDDEFINE
+
+DEFINE column USING columnList, rangeOfFloor and elevatorGroup
+ENDDEFINE
+
+DEFINE elevator USING id, elevatorStatus "MOVING or IDLE", elevatorPosition 
+ENDDEFINE
+
+
+DEFINE callbuton USING UserDirection "UP"or"DOWN", userCurrentFloor
+ENDDEFINE
+
+
+DEFINE floorRequest USING columnList, rangeOfFloor, elevatorGroup and userfloorSelected
+ENDDEFINE
+
+
+DEFINE doors USING doorControl "OPEN" or "CLOSE"
+ENDDEFINE
+
+
+DEFINE floorDisplay using elevatorPosition
+ENDDEFINE
+
+    'fIND THE BEST ELEVATOR'
+    'Make the elevator to the user position'
+    'Open the doors'
+    'Close the doors'
+    'Move the elevator to the destination'
+
+
+''AN USER click from the elevator panel from the lobby
+SEQUENCE requestElevator  USING batteryColumn, columnList, userFloor and directionValue 
+    CALL findBestColumn WITH batteryColumn columnList, userFloor  
+    CALL findBestElevator WITH userCurrentFloor AND RETURNING bestElevator
+    CALL moveElevator WITH bestElevator AND userCurrentFloor
+    CALL elevatoSensor WITH elevatorSensorWeight
+    CALL door WITH doorStatus
+   
+ENDSEQUENCE
+
+
+SEQUENCE findElevatorColumn USING battery AND columnList
+    SET column_A to elevatorList_A to Basement6, Basement5, Basement4 , Basement3, Basement2, Basement1, Lobby
+    SET column_B to elevatorList_B to is beetween 2 to 20 floor
+    SET column_C to elevatorList_C to is beetween 21 to 40 floor
+    SET column_D to elevatorList_D to is beetween 41 to 60 floor
+    
+ FOR EACH columnList 
+        IF floorSelection is B6, B5, B4 , B3, B2, B1 EQUALS at  column_A
+        IF floorSelection IS beetween 2 to 20  EQUALS at  column_B
+        IF floorSelection is beetween 21 to 40 floor EQUALS at  column_C
+        IF floorSelection is beetween 41 to 60 floor EQUALS at  column_D
+    
+    
+    FOR EACH columnList
+    IF floorSelected is B6, B5, B4 , B3, B2, B1 
+        SET elevator to column_A
+    ENDIF
+
+    IF floorSelected is beetween from 2 to 20 
+        SET elevator to column_B
+    ENDIF
+
+    IF floorSelected is beetween from 21 to 40 
+        SET elevator to column_C
+    ENDIF
+
+    IF floorSelected is beetween from 41 to 60 
+        SET elevator to column_D
+    ENDIF
+
+     IF floorSelected is LOBBY 
+        SET elevator to any column
+    ENDIF
+
+ENDSEQUENCE
+
+
+
+
+SEQUENCE findBestElevator
+    FOR EACH elevator in columnList 
+     ELSE IF elevator IS "MOVING" TO same userDirection and "UP"
+        IF elevatorPosition is LOWER then userFloor and the total of absolute elevatorPosition MINUS userFloor is lower than bestScore
+           IF bestScore is LOWER than 2 THEN	
+            SET bestElevator TO elevator
+            SET bestScore TO 2
+    ENDIF
+        
+      ELSE IF elevator IS "MOVING" TO same userDirection and "DOWN"
+        IF elevatorPosition is HIGHER then userFloor and the total of elevatorPosition MINUS userFloor is LOWER than the bestScore
+            SET bestElevator TO elevator
+            SET bestScore TO 2
+    ENDIF
+  
+
+      ELSE IF elevator IS "IDLE" 
+        IF total OF absolute elevatorPosition MINUS userFloor is lower bestScore absolute(elevatorPosition MINUS userFloor)
+            IF bestScore is LOWER than 1 THEN	
+            SET bestElevator TO elevator
+            SET bestScore TO 1
+    ENDIF
+
+ENDSEQUENCE
+
+
+'The best elevator been found, move it to the user current floor
+
+SEQUENCE moveElevator BY USING elevator AND requestedFloor
+    WHILE elevator requestList IS NOT EMPTY
+        WHILE elevator position IS LESS THAN requestedFloor
+            INCREMENT elevatorPosition
+        ENDWHILE
+        WHILE elevator position IS GREATER THAN requestedFloor
+            DECREMENT elevatorPosition
+        ENDWHILE
+        SET elevatorStatus TO "STOP"
+        SET doorStatus to "OPEN"
+            WHILE door is "OPEN"
+                IF button CLOSE = TRUE
+                    SET doorStatus TO CLOSE
+                ELSE Wait 15 second
+                    THEN SET doorStatus TO CLOSE
+            ENDIF
+        REMOVE first element of elevator requestList
+    ENDWHILE
+    SET elevatorStatus TO "IDLE"
+ENDSEQUENCE
+
+
+
+
+''Button selection from 2 option "UP" or "DOWN"
+SEQUENCE buttonRequest
+    IF button = "UP"
+        SET higher_rangeFloorSelections to an EMPTY array
+        SET higher_rangeFloorSelections TO an array from userFloor to maximumFloor
+        THEN SET higher_rangeFloorSelections list TO possibleFloorSelection
+
+    ELSE IF button = "DOWN"
+        SET lower_rangeFloorSelections to an EMPTY array
+        SET lower_rangeFloorSelections TO an array from userFloor to minimumFloor
+        THEN SET lower_rangeFloorSelections list TO possibleFloorSelection
+ENDSEQUENCE
+
+
+
+''This is the sequence to the floordisplay inside each elevator
+
+SEQUENCE floorDisplay  USING columnList, selectedcolumn, elevatorRange
+    WHILE elevator is "MOVING" INCREMENT currentElevatorFloor UNTIL elevator position = selectedFloor  
+    
+ ENDSEQUENCE
+
+
+
+'' This is to control the elevator sensor weight, so when can limit the total occupancy of each elevator
+SET elevatorSensorWeightMax = 2500 kg
+
+SEQUENCE elevatoSensor USING elevatorSensorWeight
+    FOR EACH doorControl = "CLOSE"
+    GET getElevatorWeight and ADD IT to elevatorWeightTotal
+        IF elevatorWeightTotal  LESS THEN elevatorSensorWeightMax
+            SET elevator to "MOVING"
+    
+        IF elevatorWeightTotal EQUALS OR MORE THEN elevatorSensorWeightMax
+            SET elevator to "IDLE"
+            SET pad to "Max Weight REACH"
+
+ENDSEQUENCE
