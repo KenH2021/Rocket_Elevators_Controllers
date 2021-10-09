@@ -6,11 +6,11 @@ ENDDEFINE
 DEFINE column USING columnList, rangeOfFloor and elevatorGroup
 ENDDEFINE
 
-DEFINE elevator USING id, elevatorStatus "MOVING or IDLE", elevatorPosition 
+DEFINE elevator USING id, elevatorStatus "MOVING or IDLE" or "STOP", elevatorPosition 
 ENDDEFINE
 
 
-DEFINE callbuton USING UserDirection "UP"or"DOWN", userCurrentFloor
+DEFINE callbuton USING findBestColumn, findBestElevator
 ENDDEFINE
 
 
@@ -27,7 +27,6 @@ ENDDEFINE
 
 
 ''AN USER click from the elevator panel from the lobby
-
 SEQUENCE requestElevator  USING battery, columnList, userFloor and directionValue 
     CALL findBestColumn WITH battery, columnList, userFloor  
     CALL findBestElevator WITH userCurrentFloor AND RETURNING bestElevator
@@ -47,32 +46,32 @@ SEQUENCE findElevatorColumn USING battery AND columnList
     
      
     FOR EACH columnList
-    IF floorSelected is B6, B5, B4 , B3, B2, B1 
-        SET elevator to column_A
-    ENDIF
+        IF floorSelected is B6, B5, B4 , B3, B2, B1 
+            SET elevator to column_A
+        ENDIF
 
-    IF floorSelected is beetween from 2 to 20 
-        SET elevator to column_B
-    ENDIF
+        IF floorSelected is beetween from 2 to 20 
+            SET elevator to column_B
+        ENDIF
 
-    IF floorSelected is beetween from 21 to 40 
-        SET elevator to column_C
-    ENDIF
+        IF floorSelected is beetween from 21 to 40 
+            SET elevator to column_C
+        ENDIF
 
-    IF floorSelected is beetween from 41 to 60 
-        SET elevator to column_D
-    ENDIF
+        IF floorSelected is beetween from 41 to 60 
+            SET elevator to column_D
+        ENDIF
 
-     IF floorSelected is LOBBY 
-        SET elevator to random columnList
-    ENDIF
-
+        IF floorSelected is LOBBY 
+            SET elevator to random columnList
+        ENDIF
+    ENDFOR
 ENDSEQUENCE
 
 
 
 '' This sequence is to find the best elevator
-SEQUENCE findBestElevator USING findElevatorColumn userCurrentFloor and userDirection
+SEQUENCE findBestElevator USING findElevatorColumn, elevatorGroup, userCurrentFloor and userDirection
 
     SET bestElevator
     SET bestScore TO 0
@@ -106,7 +105,7 @@ FOR EACH elevator in findElevatorColumn
             ENDIF
 
         ELSE IF elevatorStatus is moving NOT TO same userDirection
-            IF elevatorDistance IS LESS THEN elevator bestScore
+            IF absolute (elevatorPosition MINUS userFloor) IS LESS THEN absolute (elevatorPosition MINUS userFloor) elevator bestScore
                 SET bestElevator TO elevator
                 SET bestScore TO 5
             ENDIF
@@ -117,7 +116,6 @@ ENDSEQUENCE
 
 
 ''The best elevator been found, move it to the user current floor
-
 SEQUENCE moveElevator BY USING elevator and door
     WHILE elevator position IS LESS THAN requestedFloor
             INCREMENT elevatorPosition
@@ -136,8 +134,15 @@ SEQUENCE moveElevator BY USING elevator and door
                     THEN SET doorControl TO close
             ENDWHILE
     THEN moveElevator to floorSelected
-           
+    THEN WHILE elevatorPosition EQUAL floorSelected     
     SET elevatorStatus TO idle
+ENDSEQUENCE
+
+
+
+''This is the sequence to display the floor level
+SEQUENCE floorDisplay  USING columnList, selectedcolumn, elevatorRange
+    WHILE elevator is moving INCREMENT elevatorPosition UNTIL elevatorPosition = selectedFloor  
 ENDSEQUENCE
 
 
@@ -158,27 +163,3 @@ SEQUENCE elevatorSensorWeight USING elevator and door
 ENDSEQUENCE
     
 
-
-''This is the sequence to the floordisplay inside each elevator
-
-SEQUENCE floorDisplay  USING columnList, selectedcolumn, elevatorRange
-    WHILE elevator is "MOVING" INCREMENT currentElevatorFloor UNTIL elevator position = selectedFloor  
-    
- ENDSEQUENCE
-
-
-
-'' This is to control the elevator sensor weight, so when can limit the total occupancy of each elevator
-SET elevatorSensorWeightMax = 2500 kg
-
-SEQUENCE elevatoSensor USING elevatorSensorWeight
-    FOR EACH doorControl = "CLOSE"
-    GET getElevatorWeight and ADD IT to elevatorWeightTotal
-        IF elevatorWeightTotal  LESS THEN elevatorSensorWeightMax
-            SET elevator to "MOVING"
-    
-        IF elevatorWeightTotal EQUALS OR MORE THEN elevatorSensorWeightMax
-            SET elevator to "IDLE"
-            SET pad to "Max Weight REACH"
-
-ENDSEQUENCE

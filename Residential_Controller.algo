@@ -30,7 +30,7 @@ SEQUENCE callbuton USING userCurrentFloor and userDirection
 ENDSEQUENCE
 
 
-'' This sequence is to find the best elevator with the help of 3 variables moving or idle and sameDirection and oppositeDirection and nearest or farest elevator
+'' This sequence is to find the best elevator with the help of 3 variables elevator status, elevator distance  and elevator position
 
 SEQUENCE findBestElevator USING userCurrentFloor and userDirection
 
@@ -66,7 +66,7 @@ SEQUENCE findBestElevator USING userCurrentFloor and userDirection
             ENDIF
 
         ELSE IF elevatorStatus is moving NOT TO same userDirection
-            IF elevatorDistance IS LESS THEN elevator bestScore
+            IF absolute (elevatorPosition MINUS userFloor) IS LESS THEN absolute (elevatorPosition MINUS userFloor) elevator bestScore
                 SET bestElevator TO elevator
                 SET bestScore TO 5
             ENDIF
