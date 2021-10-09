@@ -1,9 +1,10 @@
 
 ''--------------DEFINE OBJECTS----------------------
+
 DEFINE column USING rangeOfFloor and listOfElevator
 ENDDEFINE
 
-DEFINE elevator USING id, elevatorStatus, elevatorPosition
+DEFINE elevator USING id, elevatorStatus, elevatorPosition, padDisplay
 ENDDEFINE
 
 
@@ -11,7 +12,7 @@ DEFINE callbuton USING userDirection "UP"or"DOWN",  userCurrentFloor
 ENDDEFINE
 
 
-DEFINE doors USING doorStatus "OPEN" or "CLOSE"
+DEFINE doors USING doorControl "OPEN" or "CLOSE"
 ENDDEFINE
 
 DEFINE floorRequest USING userfloorSelection
@@ -20,7 +21,7 @@ ENDDEFINE
 DEFINE possibleFloorSelection USING rangeOfFloor (beetween maximumFloor and minimumFloor)
 ENDDEFINE
 
-''AN USER click a button from outside elevator
+''A USER click a button from outside elevator
 SEQUENCE callbuton USING userCurrentFloor and userDirection
     CALL findBestElevator WITH userCurrentFloor AND userDirection RETURNING bestElevator
     CALL moveElevator WITH bestElevator AND userCurrentFloor
@@ -31,40 +32,53 @@ ENDSEQUENCE
 
 '' This sequence is to find the best elevator with the help of 3 variables moving or idle and sameDirection and oppositeDirection and nearest or farest elevator
 
-SET bestScore TO 0
-SET bestElevator TO bestScore
+SEQUENCE findBestElevator USING userCurrentFloor and userDirection
 
+    SET bestElevator
+    SET bestScore TO 0
 
-SEQUENCE findBestElevator
     FOR EACH elevator in columnList 
-     ELSE IF elevator IS "MOVING" TO same userDirection and "UP"
-        IF elevatorPosition is LOWER then userFloor and the total of absolute elevatorPosition MINUS userFloor is lower than bestScore
-           IF bestScore is LOWER than 2 THEN	
-            SET bestElevator TO elevator
-            SET bestScore TO 2
-    ENDIF
-        
-      ELSE IF elevator IS "MOVING" TO same userDirection and "DOWN"
-        IF elevatorPosition is HIGHER then userFloor and the total of elevatorPosition MINUS userFloor is LOWER than the bestScore
-            SET bestElevator TO elevator
-            SET bestScore TO 2
-    ENDIF
+        IF elevatorStatus is idle 
+            IF bestScore is LESS THAN 1 THEN
+                IF elevatorPosition MINUS userCurrentFloor is LESS THAN bestElevator absolute (elevatorPosition MINUS userFloor)
+                    SET bestElevator TO elevator
+                    SET bestScore TO 1                      
+            ENDIF
+
+        ELSE IF elevatorStatus is idle
+            IF elevatorPosition MINUS userCurrentFloor is LESS THAN bestElevator absolute (elevatorPosition MINUS userFloor)
+                SET bestElevator TO elevator
+                SET bestScore TO 2
+            ENDIF
+         
+        ELSE IF elevatorStatus is moving TO same userDirection and up
+            IF elevatorPosition is LOWER then userCurrentFloor and the total OF absolute (elevatorPosition MINUS userFloor) is LOWER than bestElevator
+                IF bestScore is LOWER than 3 THEN
+                    SET bestElevator TO elevator
+                    SET bestScore TO 4
+            ENDIF
+            
+        ELSE IF elevatorStatus is moving TO same userDirection and down
+            IF elevatorPosition is HIGHER then userCurrentFloor and the total OF elevatorPosition MINUS userFloor is LOWER than the bestElevator
+                IF bestScore is LOWER than 3 THEN
+                    SET bestElevator TO elevator
+                    SET bestScore TO 4
+            ENDIF
+
+        ELSE IF elevatorStatus is moving NOT TO same userDirection
+            IF elevatorDistance IS LESS THEN elevator bestScore
+                SET bestElevator TO elevator
+                SET bestScore TO 5
+            ENDIF
+    ENDFOR
   
-
-      ELSE IF elevator IS "IDLE" 
-        IF total OF absolute elevatorPosition MINUS userFloor is lower bestScore absolute(elevatorPosition MINUS userFloor)
-            IF bestScore is LOWER than 1 THEN	
-            SET bestElevator TO elevator
-            SET bestScore TO 1
-    ENDIF
-
 ENDSEQUENCE
 
 
 
 ''The best elevator been found, move it to the user current floor
 
-SEQUENCE moveElevator BY USING elevator AND requestedFloor
+SEQUENCE moveElevator BY USING elevator AND requestedFloor and door
     WHILE elevator requestList IS NOT EMPTY
         WHILE elevator position IS LESS THAN requestedFloor
             INCREMENT elevatorPosition
@@ -72,21 +86,21 @@ SEQUENCE moveElevator BY USING elevator AND requestedFloor
         WHILE elevator position IS GREATER THAN requestedFloor
             DECREMENT elevatorPosition
         ENDWHILE
-        SET elevatorStatus TO "STOP"
-        SET doorStatus to "OPEN"
-            WHILE door is "OPEN"
-                IF button CLOSE = TRUE
-                    SET doorStatus TO CLOSE
+    SET elevatorStatus TO stop
+    SET doorControl to open
+            WHILE doorControl is open
+                IF closeButton IS true
+                    SET doorControl TO close
                 ELSE Wait 15 second
-                    THEN SET doorStatus TO CLOSE
+                    THEN SET doorControl TO close
             ENDIF
         REMOVE first element of elevator requestList
     ENDWHILE
-    SET elevatorStatus TO "IDLE"
+    SET elevatorStatus TO idle
 ENDSEQUENCE
 
 
-''Floor possible selection
+''A USER choose which floor he wanna go, with the buttons inside the elevator
 
 SEQUENCE floorRequest USING elevator AND requestedFloor
     CALL moveElevator WITH elevator AND requestedFloor
@@ -96,15 +110,16 @@ END SEQUENCE
 '' This is to control the elevator sensor weight, so when can limit the total occupancy of each elevator
 SET elevatorSensorWeightMax = 2500 kg
 
-SEQUENCE elevatorSensorWeight
-    FOR EACH doorControl = "CLOSE"
-    GET getElevatorWeight and ADD IT to elevatorWeightTotal
+SEQUENCE elevatorSensorWeight USING elevator and door
+    WHILE doorControl EQUAL at close
+        GET getElevatorWeight and ADD IT to elevatorWeightTotal
         IF elevatorWeightTotal  LESS THEN elevatorSensorWeightMax
-            SET elevator to "MOVING"
-    ELSE
-        IF elevatorWeightTotal EQUALS OR MORE THEN elevatorSensorWeightMax
-            SET elevator to "IDLE"
-            SET pad to "Max Weight REACH"
-    ENDIF
+                SET elevator to moving
+        ELSE
+            IF elevatorWeightTotal EQUALS OR MORE THEN elevatorSensorWeightMax
+                SET elevator to idle
+                SET padDisplay to "Max Weight REACH, Please step out the elevator"
+         ENDIF
+    ENDWHILE
 ENDSEQUENCE
     
